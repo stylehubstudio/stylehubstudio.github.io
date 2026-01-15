@@ -8,9 +8,10 @@ function Navbar() {
   const { cartItems = [] } = useCart();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
 
-  // Cart count
+  const [search, setSearch] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const cartCount = Array.isArray(cartItems)
     ? cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0)
     : 0;
@@ -19,17 +20,17 @@ function Navbar() {
     try {
       await logout();
       navigate("/");
+      setMenuOpen(false);
     } catch (err) {
       console.error(err);
-      alert("Logout failed!");
     }
   };
 
-  // Search on Enter
   const handleSearch = (e) => {
     if (e.key === "Enter" && search.trim()) {
       navigate(`/search?q=${encodeURIComponent(search.trim())}`);
       setSearch("");
+      setMenuOpen(false);
     }
   };
 
@@ -53,27 +54,30 @@ function Navbar() {
         />
       </div>
 
-      {/* Right */}
-      <nav className="navbar-right">
-        <Link to="/">Home</Link>
+      {/* Hamburger */}
+      <div className="hamburger" onClick={() => setMenuOpen(!menuOpen)}>
+        ☰
+      </div>
 
-        <Link to="/cart" className="cart-link">
+      {/* Right */}
+      <nav className={`navbar-right ${menuOpen ? "open" : ""}`}>
+        <Link to="/" onClick={() => setMenuOpen(false)}>Home</Link>
+
+        <Link to="/cart" className="cart-link" onClick={() => setMenuOpen(false)}>
           Cart 🛒
-          {cartCount > 0 && (
-            <span className="cart-count">{cartCount}</span>
-          )}
+          {cartCount > 0 && <span className="cart-count">{cartCount}</span>}
         </Link>
 
         {user ? (
           <>
-            <Link to="/orders">Orders</Link>
-            <Link to="/profile">Profile</Link>
+            <Link to="/orders" onClick={() => setMenuOpen(false)}>Orders</Link>
+            <Link to="/profile" onClick={() => setMenuOpen(false)}>Profile</Link>
             <button className="logout-btn" onClick={handleLogout}>
               Logout
             </button>
           </>
         ) : (
-          <Link to="/auth">Login</Link>
+          <Link to="/auth" onClick={() => setMenuOpen(false)}>Login</Link>
         )}
       </nav>
     </header>
