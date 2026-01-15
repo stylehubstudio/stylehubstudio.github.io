@@ -27,7 +27,7 @@ function Checkout() {
     0
   );
 
-  /* ---------------- LOAD SAVED ADDRESS ---------------- */
+  // Load saved address
   useEffect(() => {
     if (!user) return;
 
@@ -41,9 +41,8 @@ function Checkout() {
     fetchAddress();
   }, [user]);
 
-  /* ---------------- RAZORPAY PAYMENT ---------------- */
+  // Handle payment
   const handlePayment = async () => {
-
     if (!user) {
       toast.error("Please login to place order");
       navigate("/auth");
@@ -63,36 +62,42 @@ function Checkout() {
     setPlacing(true);
 
     try {
-      // 1️⃣ Create Razorpay order
-      const res = await fetch(
-        "/api/createorder",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: total }),
-        }
-      );
+      // 1️⃣ Create Razorpay order via serverless function
+      const res = await fetch("/api/createorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: total }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to create order");
+      }
 
       const order = await res.json();
 
       // 2️⃣ Razorpay options
       const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID, // frontend key
         amount: order.amount,
         currency: "INR",
         name: "StyleHub",
         description: "Order Payment",
-        order_id: order.id,
-
+        order_id: order.id, // use Razorpay order id
         handler: async function (response) {
-          // 3️⃣ Save order after payment success
+          if (!response.razorpay_payment_id) {
+            toast.error("Payment failed: invalid response");
+            return;
+          }
+
+          // 3️⃣ Save order in Firebase
           const orderRef = await addDoc(collection(db, "orders"), {
             userId: user.uid,
             items: cartItems,
             total,
             address,
             paymentId: response.razorpay_payment_id,
-            orderId: response.razorpay_order_id,
+            orderId: order.id, // ✅ must not be undefined
             status: "Paid",
             createdAt: serverTimestamp(),
           });
@@ -109,25 +114,23 @@ function Checkout() {
           toast.success("Payment successful 🎉");
           navigate("/orders");
         },
-
         prefill: {
           email: user.email,
         },
-
         theme: { color: "#000" },
       };
 
+      // 3️⃣ Open Razorpay checkout
       const razorpay = new window.Razorpay(options);
       razorpay.open();
     } catch (err) {
-      console.error(err);
-      toast.error("Payment failed");
+      console.error("Payment error:", err);
+      toast.error("Payment failed: " + err.message);
     } finally {
       setPlacing(false);
     }
   };
 
-  /* ---------------- UI ---------------- */
   return (
     <div className="checkout-page">
       <h2>Checkout</h2>
@@ -142,9 +145,11 @@ function Checkout() {
 
       <div className="checkout-section">
         <h4>Order Summary</h4>
-
         {cartItems.map((item) => (
-          <div key={item.id} className="checkout-item">
+          <div
+            key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}
+            className="checkout-item"
+          >
             <span>
               {item.name} ({item.selectedSize}) × {item.quantity}
             </span>
