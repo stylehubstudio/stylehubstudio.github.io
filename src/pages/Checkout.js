@@ -78,7 +78,7 @@ function Checkout() {
 
       // 2️⃣ Razorpay options
       const options = {
-        key: import.meta.env.REACT_APP_RAZORPAY_KEY_ID, // frontend key
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID, // frontend key
         amount: order.amount,
         currency: "INR",
         name: "StyleHub",

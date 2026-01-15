@@ -7,11 +7,15 @@ export default async function handler(req, res) {
 
   try {
     const razorpay = new Razorpay({
-      key_id: process.env.REACT_APP_RAZORPAY_KEY_ID,
-      key_secret: process.env.REACT_APP_RAZORPAY_KEY_SECRET,
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
     const { amount } = req.body;
+
+    if (!amount || isNaN(amount)) {
+      return res.status(400).json({ error: "Invalid amount" });
+    }
 
     const order = await razorpay.orders.create({
       amount: amount * 100, // ₹ → paise
@@ -21,7 +25,7 @@ export default async function handler(req, res) {
 
     res.status(200).json(order);
   } catch (err) {
-    console.error(err);
+    console.error("Razorpay order creation error:", err);
     res.status(500).json({ error: "Order creation failed" });
   }
 }
