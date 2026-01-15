@@ -1,3 +1,4 @@
+// api/createorder.js
 import Razorpay from "razorpay";
 
 export default async function handler(req, res) {
@@ -13,15 +14,16 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Razorpay keys missing on server" });
     }
 
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: "Invalid amount" });
+    }
+
     const razorpay = new Razorpay({
       key_id: RAZORPAY_KEY_ID,
       key_secret: RAZORPAY_KEY_SECRET,
     });
-
-    const { amount } = req.body;
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
 
     const order = await razorpay.orders.create({
       amount: Math.round(amount * 100), // ₹ → paise
