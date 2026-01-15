@@ -32,9 +32,13 @@ function Checkout() {
     if (!user) return;
 
     const fetchAddress = async () => {
-      const snap = await getDoc(doc(db, "users", user.uid));
-      if (snap.exists() && snap.data().address) {
-        setAddress(snap.data().address);
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (snap.exists() && snap.data().address) {
+          setAddress(snap.data().address);
+        }
+      } catch (err) {
+        console.error("Failed to fetch address:", err);
       }
     };
 
@@ -43,7 +47,6 @@ function Checkout() {
 
   /* ---------------- RAZORPAY PAYMENT ---------------- */
   const handlePayment = async () => {
-
     if (!user) {
       toast.error("Please login to place order");
       navigate("/auth");
@@ -63,65 +66,81 @@ function Checkout() {
     setPlacing(true);
 
     try {
-      // 1️⃣ Create Razorpay order
-      const res = await fetch(
-        "/api/createorder",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: total }),
-        }
-      );
+      // 1️⃣ Create Razorpay order on backend
+      const res = await fetch("/api/createorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: total }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to create order");
+      }
 
       const order = await res.json();
+      console.log("Order from backend:", order);
+
+      if (!order.id) {
+        throw new Error("Backend did not return order ID");
+      }
 
       // 2️⃣ Razorpay options
       const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+        key: process.env.REACT_APP_RAZORPAY_KEY_ID, // CRA env variable
         amount: order.amount,
         currency: "INR",
         name: "StyleHub",
         description: "Order Payment",
         order_id: order.id,
-
         handler: async function (response) {
-          // 3️⃣ Save order after payment success
-          const orderRef = await addDoc(collection(db, "orders"), {
-            userId: user.uid,
-            items: cartItems,
-            total,
-            address,
-            paymentId: response.razorpay_payment_id,
-            orderId: response.razorpay_order_id,
-            status: "Paid",
-            createdAt: serverTimestamp(),
-          });
+          console.log("Razorpay response:", response);
 
-          await setDoc(
-            doc(db, "users", user.uid, "orders", orderRef.id),
-            {
+          if (!response.razorpay_order_id || !response.razorpay_payment_id) {
+            toast.error("Payment failed: missing payment details");
+            return;
+          }
+
+          try {
+            // 3️⃣ Save order after payment success
+            const orderRef = await addDoc(collection(db, "orders"), {
+              userId: user.uid,
+              items: cartItems,
+              total,
+              address,
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id,
+              status: "Paid",
+              createdAt: serverTimestamp(),
+            });
+
+            // 4️⃣ Link order to user for faster fetch
+            await setDoc(doc(db, "users", user.uid, "orders", orderRef.id), {
               orderId: orderRef.id,
               createdAt: serverTimestamp(),
-            }
-          );
+            });
 
-          await clearCart();
-          toast.success("Payment successful 🎉");
-          navigate("/orders");
+            // 5️⃣ Clear cart
+            await clearCart();
+            toast.success("Payment successful 🎉");
+            navigate("/orders");
+          } catch (err) {
+            console.error("Failed to save order:", err);
+            toast.error("Failed to save order after payment");
+          }
         },
-
-        prefill: {
-          email: user.email,
-        },
-
+        prefill: { email: user.email },
         theme: { color: "#000" },
       };
+
+      if (!window.Razorpay) {
+        throw new Error("Razorpay script not loaded");
+      }
 
       const razorpay = new window.Razorpay(options);
       razorpay.open();
     } catch (err) {
-      console.error(err);
-      toast.error("Payment failed");
+      console.error("Payment error:", err);
+      toast.error(err.message || "Payment failed");
     } finally {
       setPlacing(false);
     }
@@ -135,6 +154,7 @@ function Checkout() {
       <div className="checkout-section">
         <h4>Delivery Address</h4>
         <textarea
+          placeholder="Enter full address"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
         />
@@ -144,9 +164,13 @@ function Checkout() {
         <h4>Order Summary</h4>
 
         {cartItems.map((item) => (
-          <div key={item.id} className="checkout-item">
+          <div
+            key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}
+            className="checkout-item"
+          >
             <span>
-              {item.name} ({item.selectedSize}) × {item.quantity}
+              {item.name} ({item.selectedColor}, {item.selectedSize}) ×{" "}
+              {item.quantity}
             </span>
             <span>₹{item.price * item.quantity}</span>
           </div>
