@@ -2,7 +2,7 @@ import Razorpay from "razorpay";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
@@ -14,12 +14,14 @@ export default async function handler(req, res) {
     const { amount } = req.body;
 
     const order = await razorpay.orders.create({
-      amount: amount * 100,
+      amount: amount * 100, // ₹ → paise
       currency: "INR",
+      receipt: `rcpt_${Date.now()}`,
     });
 
     res.status(200).json(order);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Order creation failed" });
   }
 }

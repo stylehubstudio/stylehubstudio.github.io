@@ -64,7 +64,7 @@ function Checkout() {
     try {
       // 1️⃣ Create Razorpay order
       const res = await fetch(
-        "/api/createorder.js",
+        "/api/createorder",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
