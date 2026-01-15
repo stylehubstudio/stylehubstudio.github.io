@@ -29,25 +29,20 @@ function Checkout() {
 
   /* ---------------- LOAD SAVED ADDRESS ---------------- */
   useEffect(() => {
-    const fetchUserAddress = async () => {
-      if (!user) return;
+    if (!user) return;
 
-      try {
-        const userSnap = await getDoc(doc(db, "users", user.uid));
-        if (userSnap.exists()) {
-          const data = userSnap.data();
-          if (data.address) setAddress(data.address);
-        }
-      } catch (err) {
-        console.error("Failed to fetch address:", err);
+    const fetchAddress = async () => {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (snap.exists() && snap.data().address) {
+        setAddress(snap.data().address);
       }
     };
 
-    fetchUserAddress();
+    fetchAddress();
   }, [user]);
 
-  /* ---------------- PLACE ORDER ---------------- */
-  const placeOrder = async () => {
+  /* ---------------- RAZORPAY PAYMENT ---------------- */
+  const handlePayment = async () => {
     if (!user) {
       toast.error("Please login to place order");
       navigate("/auth");
@@ -64,47 +59,68 @@ function Checkout() {
       return;
     }
 
-    // ✅ Final stock validation
-    const invalidStock = cartItems.some(
-      (item) =>
-        Number(item.sizes?.[item.selectedSize] ?? 0) < item.quantity
-    );
-
-    if (invalidStock) {
-      toast.error("Some items are out of stock");
-      return;
-    }
-
     setPlacing(true);
 
     try {
-      /* 1️⃣ SAVE ORDER */
-      const orderRef = await addDoc(collection(db, "orders"), {
-        userId: user.uid,
-        items: cartItems,
-        total,
-        address,
-        status: "Placed",
-        createdAt: serverTimestamp(),
-      });
-
-      /* 2️⃣ LINK ORDER TO USER (FAST FETCH LATER) */
-      await setDoc(
-        doc(db, "users", user.uid, "orders", orderRef.id),
+      // 1️⃣ Create Razorpay order
+      const res = await fetch(
+        "/api/createorder.js",
         {
-          orderId: orderRef.id,
-          createdAt: serverTimestamp(),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: total }),
         }
       );
 
-      /* 3️⃣ CLEAR CART */
-      await clearCart();
+      const order = await res.json();
 
-      toast.success("Order placed successfully 🎉");
-      navigate("/orders");
+      // 2️⃣ Razorpay options
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: "INR",
+        name: "StyleHub",
+        description: "Order Payment",
+        order_id: order.id,
+
+        handler: async function (response) {
+          // 3️⃣ Save order after payment success
+          const orderRef = await addDoc(collection(db, "orders"), {
+            userId: user.uid,
+            items: cartItems,
+            total,
+            address,
+            paymentId: response.razorpay_payment_id,
+            orderId: response.razorpay_order_id,
+            status: "Paid",
+            createdAt: serverTimestamp(),
+          });
+
+          await setDoc(
+            doc(db, "users", user.uid, "orders", orderRef.id),
+            {
+              orderId: orderRef.id,
+              createdAt: serverTimestamp(),
+            }
+          );
+
+          await clearCart();
+          toast.success("Payment successful 🎉");
+          navigate("/orders");
+        },
+
+        prefill: {
+          email: user.email,
+        },
+
+        theme: { color: "#000" },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
     } catch (err) {
       console.error(err);
-      toast.error("Order failed, please try again");
+      toast.error("Payment failed");
     } finally {
       setPlacing(false);
     }
@@ -118,7 +134,6 @@ function Checkout() {
       <div className="checkout-section">
         <h4>Delivery Address</h4>
         <textarea
-          placeholder="Enter full address"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
         />
@@ -128,13 +143,9 @@ function Checkout() {
         <h4>Order Summary</h4>
 
         {cartItems.map((item) => (
-          <div
-            key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}
-            className="checkout-item"
-          >
+          <div key={item.id} className="checkout-item">
             <span>
-              {item.name} ({item.selectedColor}, {item.selectedSize}) ×{" "}
-              {item.quantity}
+              {item.name} ({item.selectedSize}) × {item.quantity}
             </span>
             <span>₹{item.price * item.quantity}</span>
           </div>
@@ -148,10 +159,10 @@ function Checkout() {
 
       <button
         className="place-order-btn"
-        onClick={placeOrder}
+        onClick={handlePayment}
         disabled={placing}
       >
-        {placing ? "PLACING ORDER..." : "PLACE ORDER"}
+        {placing ? "PROCESSING..." : "PAY NOW"}
       </button>
     </div>
   );
