@@ -1,3 +1,4 @@
+// /api/createorder.js
 import Razorpay from "razorpay";
 
 export default async function handler(req, res) {
@@ -6,35 +7,37 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { amount } = req.body;
+    // ✅ Check environment variables
+    const { REACT_APP_RAZORPAY_KEY_ID, REACT_APP_RAZORPAY_KEY_SECRET } = process.env;
 
-    console.log("Server: Received amount:", amount);
-    console.log("Server: Razorpay Key:", process.env.RAZORPAY_KEY_ID ? "FOUND" : "MISSING");
-
-    if (!amount || isNaN(amount)) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
-
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    if (!REACT_APP_RAZORPAY_KEY_ID || !REACT_APP_RAZORPAY_KEY_SECRET) {
+      console.error("Razorpay keys missing on server");
       return res.status(500).json({ error: "Razorpay keys missing on server" });
     }
 
     const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
+      key_id: REACT_APP_RAZORPAY_KEY_ID,
+      key_secret: REACT_APP_RAZORPAY_KEY_SECRET,
     });
 
-    const order = await razorpay.orders.create({
-      amount: Math.round(amount * 100), // convert ₹ → paise
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: "Invalid amount" });
+    }
+
+    // Convert ₹ → paise
+    const options = {
+      amount: Math.round(amount * 100), // paise
       currency: "INR",
       receipt: `rcpt_${Date.now()}`,
-    });
+    };
 
-    console.log("Server: Razorpay order created:", order);
+    const order = await razorpay.orders.create(options);
 
     res.status(200).json(order);
   } catch (err) {
-    console.error("Server: Razorpay error:", err);
+    console.error("Order creation failed:", err);
     res.status(500).json({ error: "Order creation failed" });
   }
 }

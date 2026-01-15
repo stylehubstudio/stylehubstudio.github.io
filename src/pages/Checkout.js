@@ -30,18 +30,13 @@ function Checkout() {
   // Load saved address
   useEffect(() => {
     if (!user) return;
-
     const fetchAddress = async () => {
       const snap = await getDoc(doc(db, "users", user.uid));
-      if (snap.exists() && snap.data().address) {
-        setAddress(snap.data().address);
-      }
+      if (snap.exists() && snap.data().address) setAddress(snap.data().address);
     };
-
     fetchAddress();
   }, [user]);
 
-  // Handle payment
   const handlePayment = async () => {
     if (!user) {
       toast.error("Please login to place order");
@@ -62,70 +57,82 @@ function Checkout() {
     setPlacing(true);
 
     try {
-      // 1️⃣ Create Razorpay order via serverless function
+      // 1️⃣ Create Razorpay order on your server
       const res = await fetch("/api/createorder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: total }),
       });
 
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "Failed to create order");
-      }
+      if (!res.ok) throw new Error("Failed to create order");
 
       const order = await res.json();
 
       // 2️⃣ Razorpay options
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID, // frontend key
-        amount: order.amount,
-        currency: "INR",
+        key: process.env.REACT_APP_RAZORPAY_KEY_ID, // Your Key ID
+        amount: order.amount, // in paise
+        currency: order.currency || "INR",
         name: "StyleHub",
         description: "Order Payment",
-        order_id: order.id, // use Razorpay order id
+        image: "https://stylehubstudio.in/logo192.png", // optional
+        order_id: order.id,
         handler: async function (response) {
-          if (!response.razorpay_payment_id) {
-            toast.error("Payment failed: invalid response");
-            return;
-          }
-
-          // 3️⃣ Save order in Firebase
-          const orderRef = await addDoc(collection(db, "orders"), {
-            userId: user.uid,
-            items: cartItems,
-            total,
-            address,
-            paymentId: response.razorpay_payment_id,
-            orderId: order.id, // ✅ must not be undefined
-            status: "Paid",
-            createdAt: serverTimestamp(),
-          });
-
-          await setDoc(
-            doc(db, "users", user.uid, "orders", orderRef.id),
-            {
-              orderId: orderRef.id,
+          // Save order in Firestore
+          try {
+            const orderRef = await addDoc(collection(db, "orders"), {
+              userId: user.uid,
+              items: cartItems,
+              total,
+              address,
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id,
+              status: "Paid",
               createdAt: serverTimestamp(),
-            }
-          );
+            });
 
-          await clearCart();
-          toast.success("Payment successful 🎉");
-          navigate("/orders");
+            await setDoc(
+              doc(db, "users", user.uid, "orders", orderRef.id),
+              {
+                orderId: orderRef.id,
+                createdAt: serverTimestamp(),
+              }
+            );
+
+            await clearCart();
+            toast.success("Payment successful 🎉");
+            navigate("/orders");
+          } catch (err) {
+            console.error("Error saving order:", err);
+            toast.error("Payment was successful but saving order failed");
+          }
         },
         prefill: {
-          email: user.email,
+          name: user.displayName || "",
+          email: user.email || "",
+          contact: user.phoneNumber || "",
         },
-        theme: { color: "#000" },
+        notes: {
+          address,
+        },
+        theme: {
+          color: "#3399cc",
+        },
       };
 
-      // 3️⃣ Open Razorpay checkout
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
+      const rzp = new window.Razorpay(options);
+
+      rzp.on("payment.failed", function (response) {
+        console.error("Payment failed:", response);
+        toast.error(
+          `Payment failed: ${response.error.reason || response.error.description}`
+        );
+      });
+
+      rzp.open();
     } catch (err) {
       console.error("Payment error:", err);
-      toast.error("Payment failed: " + err.message);
+      toast.error(err.message || "Payment failed");
     } finally {
       setPlacing(false);
     }
@@ -146,10 +153,7 @@ function Checkout() {
       <div className="checkout-section">
         <h4>Order Summary</h4>
         {cartItems.map((item) => (
-          <div
-            key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}
-            className="checkout-item"
-          >
+          <div key={item.id} className="checkout-item">
             <span>
               {item.name} ({item.selectedSize}) × {item.quantity}
             </span>
