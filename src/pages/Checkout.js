@@ -27,82 +27,82 @@ function Checkout() {
   }, [user]);
 
   const handlePayment = async () => {
-    if (!user) {
-      toast.error("Please login to place order");
-      navigate("/auth");
-      return;
+  if (!user) {
+    toast.error("Please login to place order");
+    navigate("/auth");
+    return;
+  }
+
+  if (!address.trim()) {
+    toast.error("Please enter delivery address");
+    return;
+  }
+
+  if (cartItems.length === 0) {
+    toast.error("Cart is empty");
+    return;
+  }
+
+  setPlacing(true);
+
+  try {
+    // 1️⃣ Create order on server
+    const res = await fetch("/api/createorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: total }),
+    });
+
+    const order = await res.json();
+
+    if (!order?.id) {
+      throw new Error(order?.error || "Failed to create order");
     }
-    if (!address.trim()) {
-      toast.error("Please enter delivery address");
-      return;
-    }
-    if (cartItems.length === 0) {
-      toast.error("Cart is empty");
-      return;
-    }
 
-    setPlacing(true);
+    // 2️⃣ Razorpay options
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID, // frontend key
+      amount: order.amount,
+      currency: order.currency,
+      name: "StyleHub",
+      description: "Order Payment",
+      order_id: order.id,
+      handler: async function (response) {
+        // save order in Firestore
+        const orderRef = await addDoc(collection(db, "orders"), {
+          userId: user.uid,
+          items: cartItems,
+          total,
+          address,
+          paymentId: response.razorpay_payment_id,
+          orderId: response.razorpay_order_id,
+          status: "Paid",
+          createdAt: serverTimestamp(),
+        });
 
-    try {
-      // 1️⃣ Create order on server
-      const res = await fetch("/api/createorder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: total }),
-      });
+        await setDoc(doc(db, "users", user.uid, "orders", orderRef.id), {
+          orderId: orderRef.id,
+          createdAt: serverTimestamp(),
+        });
 
-      if (!res.ok) throw new Error("Failed to create order");
-      const order = await res.json();
+        await clearCart();
+        toast.success("Payment successful 🎉");
+        navigate("/orders");
+      },
+      prefill: { email: user.email },
+      theme: { color: "#000" },
+    };
 
-      // 2️⃣ Razorpay options
-      const options = {
-        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-        amount: order.amount,
-        currency: order.currency,
-        name: "StyleHub",
-        description: "Order Payment",
-        order_id: order.id,
-        prefill: {
-          email: user.email,
-          name: user.displayName || "Customer",
-        },
-        theme: { color: "#000" },
-        handler: async function (response) {
-          // 3️⃣ Save order in Firestore
-          const orderRef = await addDoc(collection(db, "orders"), {
-            userId: user.uid,
-            items: cartItems,
-            total,
-            address,
-            paymentId: response.razorpay_payment_id,
-            orderId: response.razorpay_order_id,
-            status: "Paid",
-            createdAt: serverTimestamp(),
-          });
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  } catch (err) {
+    console.error("Payment error:", err);
+    toast.error(err.message || "Payment failed");
+  } finally {
+    setPlacing(false);
+  }
+};
 
-          await setDoc(doc(db, "users", user.uid, "orders", orderRef.id), {
-            orderId: orderRef.id,
-            createdAt: serverTimestamp(),
-          });
-
-          await clearCart();
-          toast.success("Payment successful 🎉");
-          navigate("/orders");
-        },
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-      rzp.on("payment.failed", function (response) {
-        toast.error(`Payment failed: ${response.error.description}`);
-      });
-    } catch (err) {
-      console.error("Payment error:", err);
-      toast.error(err.message || "Payment failed");
-    } finally {
-      setPlacing(false);
-    }
-  };
 
   return (
     <div className="checkout-page">

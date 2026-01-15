@@ -1,41 +1,41 @@
-// api/createorder.js
 import Razorpay from "razorpay";
-console.log("RAZORPAY_KEY_ID:", process.env.RAZORPAY_KEY_ID);
-console.log("RAZORPAY_KEY_SECRET:", process.env.RAZORPAY_KEY_SECRET);
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  const { amount } = req.body;
+
+  // Validate amount
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ error: "Invalid amount" });
+  }
+
+  // Check environment variables
+  const key_id = process.env.RAZORPAY_KEY_ID;
+  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+
+  if (!key_id || !key_secret) {
+    console.error("Razorpay keys missing on server");
+    return res.status(500).json({ error: "Razorpay keys missing on server" });
+  }
+
   try {
-    const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } = process.env;
-
-    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-      console.error("Razorpay keys missing on server");
-      return res.status(500).json({ error: "Razorpay keys missing on server" });
-    }
-
-    const { amount } = req.body;
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
-
     const razorpay = new Razorpay({
-      key_id: RAZORPAY_KEY_ID,
-      key_secret: RAZORPAY_KEY_SECRET,
+      key_id,
+      key_secret,
     });
 
     const order = await razorpay.orders.create({
-      amount: Math.round(amount * 100), // ₹ → paise
+      amount: amount * 100, // ₹ → paise
       currency: "INR",
       receipt: `rcpt_${Date.now()}`,
     });
 
     res.status(200).json(order);
   } catch (err) {
-    console.error("Order creation failed:", err);
+    console.error("Razorpay order creation failed:", err);
     res.status(500).json({ error: "Order creation failed" });
   }
 }
