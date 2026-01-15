@@ -1,5 +1,7 @@
 // api/createorder.js
 import Razorpay from "razorpay";
+console.log("RAZORPAY_KEY_ID:", process.env.RAZORPAY_KEY_ID);
+console.log("RAZORPAY_KEY_SECRET:", process.env.RAZORPAY_KEY_SECRET);
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
