@@ -9,8 +9,8 @@ export default async function handler(req, res) {
     // ⚠️ CRA env variables start with REACT_APP_ but in Vercel functions, use process.env.<YOUR_KEY>
     // Make sure you set these in Vercel dashboard under Project Settings → Environment Variables
     const razorpay = new Razorpay({
-      key_id: process.env.REACT_APP_RAZORPAY_KEY_ID,
-      key_secret: process.env.REACT_APP_RAZORPAY_KEY_SECRET,
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
     const { amount } = req.body;
