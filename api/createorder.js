@@ -6,29 +6,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ⚠️ CRA env variables start with REACT_APP_ but in Vercel functions, use process.env.<YOUR_KEY>
-    // Make sure you set these in Vercel dashboard under Project Settings → Environment Variables
     const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
+      key_id: process.env.REACT_APP_RAZORPAY_KEY_ID,
+      key_secret: process.env.REACT_APP_RAZORPAY_KEY_SECRET,
     });
 
     const { amount } = req.body;
 
-    if (!amount || isNaN(amount)) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
-
-    // Create Razorpay order
     const order = await razorpay.orders.create({
-      amount: amount * 100, // Convert ₹ to paise
+      amount: amount * 100, // ₹ → paise
       currency: "INR",
       receipt: `rcpt_${Date.now()}`,
     });
 
     res.status(200).json(order);
   } catch (err) {
-    console.error("Razorpay order creation error:", err);
+    console.error(err);
     res.status(500).json({ error: "Order creation failed" });
   }
 }
