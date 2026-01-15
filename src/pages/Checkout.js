@@ -43,7 +43,6 @@ function Checkout() {
 
   /* ---------------- RAZORPAY PAYMENT ---------------- */
   const handlePayment = async () => {
-    console.log("Razorpay Key:", import.meta.env.VITE_RAZORPAY_KEY_ID);
 
     if (!user) {
       toast.error("Please login to place order");
@@ -78,7 +77,7 @@ function Checkout() {
 
       // 2️⃣ Razorpay options
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: process.env.REACT_APP_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: "INR",
         name: "StyleHub",
