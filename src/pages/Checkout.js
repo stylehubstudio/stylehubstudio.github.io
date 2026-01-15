@@ -43,6 +43,8 @@ function Checkout() {
 
   /* ---------------- RAZORPAY PAYMENT ---------------- */
   const handlePayment = async () => {
+    console.log("Razorpay Key:", import.meta.env.VITE_RAZORPAY_KEY_ID);
+
     if (!user) {
       toast.error("Please login to place order");
       navigate("/auth");
