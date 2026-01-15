@@ -1,0 +1,124 @@
+/* orders.css */
+.orders-page {
+  max-width: 1000px;
+  margin: auto;
+  padding: 40px 20px;
+  font-family: sans-serif;
+}
+
+.orders-page h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  font-size: 26px;
+}
+
+/* Order Card */
+.order-card {
+  border: 1px solid #e5e5e5;
+  padding: 15px 20px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 15px;
+  transition: 0.3s ease;
+  cursor: pointer;
+}
+
+.order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Order Header */
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.order-id {
+  flex: 1;
+  font-weight: 600;
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: #fff;
+  text-transform: capitalize;
+  font-size: 12px;
+  min-width: 80px;
+  text-align: center;
+}
+
+/* Expand Icon */
+.expand-icon {
+  font-size: 14px;
+  margin-left: 10px;
+}
+
+/* Order Items */
+.order-items {
+  margin-top: 15px;
+  border-top: 1px solid #eee;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+/* Footer */
+.order-footer {
+  margin-top: 15px;
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 15px;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
+
+/* Center Text */
+.center-text {
+  text-align: center;
+  margin-top: 80px;
+  font-size: 14px;
+  color: #555;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .orders-page {
+    padding: 20px 10px;
+  }
+
+  .order-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .expand-icon {
+    align-self: flex-end;
+  }
+
+  .order-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .order-footer {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

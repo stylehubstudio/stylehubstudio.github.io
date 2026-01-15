@@ -1,0 +1,73 @@
+.search-page {
+  padding: 40px;
+}
+
+.search-title {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.search-title span {
+  font-weight: bold;
+}
+
+.search-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 24px;
+}
+
+.search-card {
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.search-card:hover {
+  transform: translateY(-2px);
+}
+
+.search-img-wrap {
+  background: #f6f6f6;
+  padding: 10px;
+}
+
+.search-img-wrap img {
+  width: 100%;
+  object-fit: cover;
+}
+
+.search-info {
+  padding-top: 10px;
+}
+
+.search-name {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.search-price {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.filter-bar select,
+.filter-bar input {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.clear-filters {
+  background: black;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  cursor: pointer;
+}

@@ -1,0 +1,98 @@
+.checkout-page {
+  max-width: 720px;
+  margin: 60px auto;
+  padding: 0 20px 80px;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+.checkout-page h2 {
+  font-size: 24px;
+  font-weight: 400;
+  margin-bottom: 40px;
+  letter-spacing: 1px;
+}
+
+/* SECTION */
+.checkout-section {
+  margin-bottom: 40px;
+}
+
+.checkout-section h4 {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ADDRESS */
+.checkout-section textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 12px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  resize: none;
+  outline: none;
+}
+
+.checkout-section textarea:focus {
+  border-color: #000;
+}
+
+/* ORDER ITEMS */
+.checkout-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-size: 14px;
+  border-bottom: 1px solid #eee;
+}
+
+.checkout-item span:last-child {
+  font-weight: 500;
+}
+
+/* TOTAL */
+.checkout-total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  font-size: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #000;
+}
+
+/* PLACE ORDER BUTTON */
+.place-order-btn {
+  width: 100%;
+  margin-top: 50px;
+  padding: 14px 0;
+  background: #000;
+  color: #fff;
+  border: none;
+  font-size: 13px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.place-order-btn:hover {
+  opacity: 0.85;
+}
+
+.place-order-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* MOBILE */
+@media (max-width: 600px) {
+  .checkout-page {
+    margin-top: 40px;
+  }
+
+  .checkout-page h2 {
+    font-size: 20px;
+  }
+}
