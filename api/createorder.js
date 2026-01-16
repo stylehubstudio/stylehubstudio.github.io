@@ -1,35 +1,44 @@
-const Razorpay = require("razorpay");
+import Razorpay from "razorpay";
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
+  console.log("🟢 API HIT");
+  console.log("➡️ Method:", req.method);
+
   if (req.method !== "POST") {
+    console.log("❌ Wrong method");
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  console.log("🟡 ENV CHECK");
+  console.log("KEY ID:", process.env.RAZORPAY_KEY_ID ? "FOUND" : "MISSING");
+  console.log("KEY SECRET:", process.env.RAZORPAY_KEY_SECRET ? "FOUND" : "MISSING");
+
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-    return res.status(500).json({ error: "Razorpay keys missing on server" });
+    console.log("❌ ENV MISSING");
+    return res.status(500).json({
+      error: "Razorpay keys missing on server",
+    });
   }
 
   try {
+    const { amount } = req.body;
+    console.log("🟣 Amount received:", amount);
+
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    const { amount } = req.body;
-
-    if (!amount || amount < 1) {
-      return res.status(400).json({ error: "Invalid amount" });
-    }
-
     const order = await razorpay.orders.create({
-      amount: Math.round(amount * 100), // ₹ → paise
+      amount: amount * 100,
       currency: "INR",
-      receipt: `receipt_${Date.now()}`,
     });
 
-    return res.status(200).json(order);
+    console.log("✅ ORDER CREATED:", order.id);
+
+    res.status(200).json(order);
   } catch (err) {
-    console.error("Razorpay error:", err);
-    return res.status(500).json({ error: "Order creation failed" });
+    console.error("🔥 RAZORPAY ERROR:", err);
+    res.status(500).json({ error: "Order creation failed" });
   }
-};
+}
