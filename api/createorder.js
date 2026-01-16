@@ -1,13 +1,13 @@
+export const config = {
+  runtime: "nodejs",
+};
+
 import Razorpay from "razorpay";
 
 export default async function handler(req, res) {
-  console.log("KEY_ID =", process.env.RAZORPAY_KEY_ID);
-  console.log(
-    "KEY_SECRET =",
-    process.env.RAZORPAY_KEY_SECRET
-      ? process.env.RAZORPAY_KEY_SECRET.length
-      : "MISSING"
-  );
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
   try {
     const razorpay = new Razorpay({
@@ -16,14 +16,17 @@ export default async function handler(req, res) {
     });
 
     const order = await razorpay.orders.create({
-      amount: 100,
+      amount: Number(req.body.amount) * 100,
       currency: "INR",
-      receipt: "test_receipt",
+      receipt: `receipt_${Date.now()}`,
     });
 
     return res.status(200).json(order);
-  } catch (e) {
-    console.error("RAZORPAY ERROR:", e);
-    return res.status(500).json(e);
+  } catch (error) {
+    console.error("RAZORPAY ERROR:", error);
+    return res.status(500).json({
+      statusCode: error.statusCode,
+      error: error.error,
+    });
   }
 }
