@@ -34,11 +34,10 @@ function Checkout() {
     const fetchAddress = async () => {
       try {
         console.log("🟡 Fetching saved address");
-        console.log("🔑 RAZORPAY_KEY_ID:", process.env.RAZORPAY_KEY_ID);
-        console.log("🔐 RAZORPAY_KEY_SECRET:", process.env.RAZORPAY_KEY_SECRET);
+
         const snap = await getDoc(doc(db, "users", user.uid));
         if (snap.exists() && snap.data()?.address) {
-          console.log("🟢 Address found");
+          console.log("🟢 Address loaded");
           setAddress(snap.data().address);
         }
       } catch (err) {
@@ -54,20 +53,17 @@ function Checkout() {
     console.log("🟢 STEP 0: Pay button clicked");
 
     if (!user) {
-      console.log("❌ FAIL: user not logged in");
       toast.error("Please login to place order");
       navigate("/auth");
       return;
     }
 
     if (!address.trim()) {
-      console.log("❌ FAIL: address empty");
       toast.error("Please enter delivery address");
       return;
     }
 
     if (cartItems.length === 0) {
-      console.log("❌ FAIL: cart empty");
       toast.error("Cart is empty");
       return;
     }
@@ -79,7 +75,7 @@ function Checkout() {
 
     try {
       /* ---------- CREATE ORDER ---------- */
-      console.log("🟡 STEP 2: POST /api/createorder");
+      console.log("🟡 STEP 2: Creating order on server");
 
       const res = await fetch("/api/createorder", {
         method: "POST",
@@ -87,43 +83,39 @@ function Checkout() {
         body: JSON.stringify({ amount: total }),
       });
 
-      console.log("⬅️ STEP 3: Response status:", res.status);
+      console.log("⬅️ STEP 3: Server status:", res.status);
 
-      const rawText = await res.text();
-      console.log("⬅️ Raw response:", rawText);
+      const text = await res.text();
+      console.log("⬅️ Raw response:", text);
 
       let order;
       try {
-        order = JSON.parse(rawText);
+        order = JSON.parse(text);
       } catch {
-        console.error("❌ FAIL: Server returned HTML / non-JSON");
-        throw new Error("Server error (non-JSON response)");
+        throw new Error("Server returned invalid JSON");
       }
 
       console.log("📦 STEP 4: Parsed order:", order);
 
       if (!res.ok || !order?.id) {
-        console.error("❌ FAIL: Order creation failed");
-        throw new Error(order?.error || "Failed to create order");
+        throw new Error(order?.error || "Order creation failed");
       }
 
       console.log("🟢 STEP 5: Order created:", order.id);
 
       /* ---------- RAZORPAY ---------- */
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID, // PUBLIC KEY ONLY
         amount: order.amount,
         currency: "INR",
         name: "StyleHub",
         description: "Order Payment",
         order_id: order.id,
 
-        handler: async function (response) {
-          console.log("🟢 STEP 6: Razorpay success");
-          console.log("💳 Razorpay response:", response);
+        handler: async (response) => {
+          console.log("🟢 STEP 6: Payment success", response);
 
           if (!response?.razorpay_order_id) {
-            console.error("❌ FAIL: Missing razorpay_order_id");
             toast.error("Payment verification failed");
             return;
           }
@@ -141,8 +133,6 @@ function Checkout() {
             createdAt: serverTimestamp(),
           });
 
-          console.log("✅ STEP 8: Order saved:", orderRef.id);
-
           await setDoc(
             doc(db, "users", user.uid, "orders", orderRef.id),
             {
@@ -151,7 +141,7 @@ function Checkout() {
             }
           );
 
-          console.log("🟢 STEP 9: User order reference saved");
+          console.log("✅ STEP 8: Order saved");
 
           await clearCart();
           toast.success("Payment successful 🎉");
@@ -165,9 +155,8 @@ function Checkout() {
         theme: { color: "#000" },
       };
 
-      console.log("🟡 STEP 10: Opening Razorpay");
-      const rzp = new window.Razorpay(options);
-      rzp.open();
+      console.log("🟡 STEP 9: Opening Razorpay");
+      new window.Razorpay(options).open();
     } catch (err) {
       console.error("🔥 FINAL ERROR:", err);
       toast.error(err.message || "Payment failed");
