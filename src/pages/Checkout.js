@@ -27,61 +27,89 @@ function Checkout() {
     0
   );
 
-  /* ---------------- LOAD SAVED ADDRESS ---------------- */
+  /* ================= LOAD SAVED ADDRESS ================= */
   useEffect(() => {
     if (!user) return;
 
     const fetchAddress = async () => {
       try {
+        console.log("🟡 Fetching saved address");
         const snap = await getDoc(doc(db, "users", user.uid));
         if (snap.exists() && snap.data()?.address) {
+          console.log("🟢 Address found");
           setAddress(snap.data().address);
         }
       } catch (err) {
-        console.error("Address load error:", err);
+        console.error("❌ Address load error:", err);
       }
     };
 
     fetchAddress();
   }, [user]);
 
-  /* ---------------- PAYMENT ---------------- */
+  /* ================= PAYMENT FLOW ================= */
   const handlePayment = async () => {
+    console.log("🟢 STEP 0: Pay button clicked");
+
     if (!user) {
+      console.log("❌ FAIL: user not logged in");
       toast.error("Please login to place order");
       navigate("/auth");
       return;
     }
 
     if (!address.trim()) {
+      console.log("❌ FAIL: address empty");
       toast.error("Please enter delivery address");
       return;
     }
 
     if (cartItems.length === 0) {
+      console.log("❌ FAIL: cart empty");
       toast.error("Cart is empty");
       return;
     }
 
+    console.log("🟢 STEP 1: Validation passed");
+    console.log("➡️ Total amount:", total);
+
     setPlacing(true);
 
     try {
-      /* 1️⃣ CREATE ORDER ON SERVER */
+      /* ---------- CREATE ORDER ---------- */
+      console.log("🟡 STEP 2: POST /api/createorder");
+
       const res = await fetch("/api/createorder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: total }),
       });
 
-      const order = await res.json();
+      console.log("⬅️ STEP 3: Response status:", res.status);
+
+      const rawText = await res.text();
+      console.log("⬅️ Raw response:", rawText);
+
+      let order;
+      try {
+        order = JSON.parse(rawText);
+      } catch {
+        console.error("❌ FAIL: Server returned HTML / non-JSON");
+        throw new Error("Server error (non-JSON response)");
+      }
+
+      console.log("📦 STEP 4: Parsed order:", order);
 
       if (!res.ok || !order?.id) {
+        console.error("❌ FAIL: Order creation failed");
         throw new Error(order?.error || "Failed to create order");
       }
 
-      /* 2️⃣ RAZORPAY OPTIONS */
+      console.log("🟢 STEP 5: Order created:", order.id);
+
+      /* ---------- RAZORPAY ---------- */
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID, // PUBLIC KEY
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: "INR",
         name: "StyleHub",
@@ -89,12 +117,17 @@ function Checkout() {
         order_id: order.id,
 
         handler: async function (response) {
+          console.log("🟢 STEP 6: Razorpay success");
+          console.log("💳 Razorpay response:", response);
+
           if (!response?.razorpay_order_id) {
+            console.error("❌ FAIL: Missing razorpay_order_id");
             toast.error("Payment verification failed");
             return;
           }
 
-          /* 3️⃣ SAVE ORDER */
+          console.log("🟡 STEP 7: Saving order to Firestore");
+
           const orderRef = await addDoc(collection(db, "orders"), {
             userId: user.uid,
             items: cartItems,
@@ -106,6 +139,8 @@ function Checkout() {
             createdAt: serverTimestamp(),
           });
 
+          console.log("✅ STEP 8: Order saved:", orderRef.id);
+
           await setDoc(
             doc(db, "users", user.uid, "orders", orderRef.id),
             {
@@ -113,6 +148,8 @@ function Checkout() {
               createdAt: serverTimestamp(),
             }
           );
+
+          console.log("🟢 STEP 9: User order reference saved");
 
           await clearCart();
           toast.success("Payment successful 🎉");
@@ -126,17 +163,19 @@ function Checkout() {
         theme: { color: "#000" },
       };
 
+      console.log("🟡 STEP 10: Opening Razorpay");
       const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (err) {
-      console.error("Payment error:", err);
+      console.error("🔥 FINAL ERROR:", err);
       toast.error(err.message || "Payment failed");
     } finally {
       setPlacing(false);
+      console.log("🔵 END: placing=false");
     }
   };
 
-  /* ---------------- UI ---------------- */
+  /* ================= UI ================= */
   return (
     <div className="checkout-page">
       <h2>Checkout</h2>
