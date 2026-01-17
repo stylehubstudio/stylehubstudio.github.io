@@ -98,7 +98,7 @@ function Checkout() {
       console.log("📦 STEP 4: Parsed order:", order);
 
       if (!res.ok || !order?.id) {
-        throw new Error(order?.error || "Order creation failed");
+        throw new Error(order?.error?discription || "Order creation failed");
       }
 
       console.log("🟢 STEP 5: Order created:", order.id);
