@@ -27,6 +27,19 @@ function Checkout() {
     0
   );
 
+  /* ================= LOAD RAZORPAY SCRIPT ================= */
+  useEffect(() => {
+    if (window.Razorpay) return;
+
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => console.log("🟢 Razorpay SDK loaded");
+    script.onerror = () => console.error("❌ Razorpay SDK failed to load");
+
+    document.body.appendChild(script);
+  }, []);
+
   /* ================= LOAD SAVED ADDRESS ================= */
   useEffect(() => {
     if (!user) return;
@@ -34,11 +47,10 @@ function Checkout() {
     const fetchAddress = async () => {
       try {
         console.log("🟡 Fetching saved address");
-
         const snap = await getDoc(doc(db, "users", user.uid));
         if (snap.exists() && snap.data()?.address) {
-          console.log("🟢 Address loaded");
           setAddress(snap.data().address);
+          console.log("🟢 Address loaded");
         }
       } catch (err) {
         console.error("❌ Address load error:", err);
@@ -53,29 +65,26 @@ function Checkout() {
     console.log("🟢 STEP 0: Pay button clicked");
 
     if (!user) {
-      toast.error("Please login to place order");
-      navigate("/auth");
-      return;
+      toast.error("Please login to continue");
+      return navigate("/auth");
     }
 
     if (!address.trim()) {
-      toast.error("Please enter delivery address");
-      return;
+      return toast.error("Please enter delivery address");
     }
 
     if (cartItems.length === 0) {
-      toast.error("Cart is empty");
-      return;
+      return toast.error("Cart is empty");
     }
 
-    console.log("🟢 STEP 1: Validation passed");
-    console.log("➡️ Total amount:", total);
+    if (!window.Razorpay) {
+      return toast.error("Payment SDK not loaded");
+    }
 
     setPlacing(true);
 
     try {
-      /* ---------- CREATE ORDER ---------- */
-      console.log("🟡 STEP 2: Creating order on server");
+      console.log("🟡 STEP 1: Creating Razorpay order");
 
       const res = await fetch("/api/createorder", {
         method: "POST",
@@ -83,86 +92,77 @@ function Checkout() {
         body: JSON.stringify({ amount: total }),
       });
 
-      console.log("⬅️ STEP 3: Server status:", res.status);
+      const data = await res.json();
+      console.log("⬅️ Server response:", data);
 
-      const text = await res.text();
-      console.log("⬅️ Raw response:", text);
-
-      let order;
-      try {
-        order = JSON.parse(text);
-      } catch {
-        throw new Error("Server returned invalid JSON");
+      if (!res.ok || !data?.id) {
+        throw new Error(data?.error || "Order creation failed");
       }
 
-      console.log("📦 STEP 4: Parsed order:", order);
+      console.log("🟢 STEP 2: Order created:", data.id);
 
-      if (!res.ok || !order?.id) {
-        throw new Error(order?.error?.discription || "Order creation failed");
-      }
-
-      console.log("🟢 STEP 5: Order created:", order.id);
-
-      /* ---------- RAZORPAY ---------- */
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID, // PUBLIC KEY ONLY
-        amount: order.amount,
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: data.amount,
         currency: "INR",
         name: "StyleHub",
         description: "Order Payment",
-        order_id: order.id,
+        order_id: data.id,
 
         handler: async (response) => {
-          console.log("🟢 STEP 6: Payment success", response);
+          console.log("🟢 STEP 3: Payment success", response);
 
-          if (!response?.razorpay_order_id) {
-            toast.error("Payment verification failed");
-            return;
-          }
-
-          console.log("🟡 STEP 7: Saving order to Firestore");
-
-          const orderRef = await addDoc(collection(db, "orders"), {
-            userId: user.uid,
-            items: cartItems,
-            total,
-            address,
-            paymentId: response.razorpay_payment_id,
-            orderId: response.razorpay_order_id,
-            status: "Paid",
-            createdAt: serverTimestamp(),
-          });
-
-          await setDoc(
-            doc(db, "users", user.uid, "orders", orderRef.id),
-            {
-              orderId: orderRef.id,
+          try {
+            const orderRef = await addDoc(collection(db, "orders"), {
+              userId: user.uid,
+              items: cartItems,
+              total,
+              address,
+              paymentId: response.razorpay_payment_id,
+              orderId: response.razorpay_order_id,
+              status: "Paid",
               createdAt: serverTimestamp(),
-            }
-          );
+            });
 
-          console.log("✅ STEP 8: Order saved");
+            await setDoc(
+              doc(db, "users", user.uid, "orders", orderRef.id),
+              {
+                orderId: orderRef.id,
+                createdAt: serverTimestamp(),
+              }
+            );
 
-          await clearCart();
-          toast.success("Payment successful 🎉");
-          navigate("/orders");
+            await clearCart();
+            toast.success("Payment successful 🎉");
+            navigate("/orders");
+          } catch (err) {
+            console.error("❌ Firestore save failed:", err);
+            toast.error("Payment saved failed");
+          }
         },
 
         prefill: {
-          email: user.email,
+          email: user.email || "",
         },
 
-        theme: { color: "#000" },
+        theme: { color: "#000000" },
       };
 
-      console.log("🟡 STEP 9: Opening Razorpay");
-      new window.Razorpay(options).open();
+      const rzp = new window.Razorpay(options);
+
+      rzp.on("payment.failed", (res) => {
+        console.error("❌ Payment failed:", res.error);
+        toast.error(res.error.description || "Payment failed");
+      });
+
+      console.log("🟡 STEP 4: Opening Razorpay");
+      rzp.open();
+
     } catch (err) {
       console.error("🔥 FINAL ERROR:", err);
       toast.error(err.message || "Payment failed");
     } finally {
       setPlacing(false);
-      console.log("🔵 END: placing=false");
     }
   };
 
