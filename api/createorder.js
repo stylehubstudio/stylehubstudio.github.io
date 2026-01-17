@@ -1,7 +1,3 @@
-export const config = {
-  runtime: "nodejs",
-};
-
 import Razorpay from "razorpay";
 
 export default async function handler(req, res) {
@@ -15,18 +11,18 @@ export default async function handler(req, res) {
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
+    const { amount } = req.body;
+
+    // Create order on Razorpay
     const order = await razorpay.orders.create({
-      amount: Number(req.body.amount) * 100,
+      amount: amount * 100, // amount in paise
       currency: "INR",
-      receipt: `receipt_${Date.now()}`,
+      receipt: `receipt_${Date.now()}`, // unique internal order ref
     });
 
-    return res.status(200).json(order);
-  } catch (error) {
-    console.error("RAZORPAY ERROR:", error);
-    return res.status(500).json({
-      statusCode: error.statusCode,
-      error: error.error,
-    });
+    res.status(200).json(order);
+  } catch (err) {
+    console.error("Order creation failed:", err);
+    res.status(500).json({ error: "Order creation failed" });
   }
 }
