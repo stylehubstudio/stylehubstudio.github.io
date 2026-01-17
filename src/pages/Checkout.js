@@ -27,43 +27,34 @@ function Checkout() {
     0
   );
 
-  /* ================= LOAD RAZORPAY SCRIPT ================= */
+  /* Load Razorpay */
   useEffect(() => {
     if (window.Razorpay) return;
-
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
-    script.onload = () => console.log("🟢 Razorpay SDK loaded");
-    script.onerror = () => console.error("❌ Razorpay SDK failed to load");
-
     document.body.appendChild(script);
   }, []);
 
-  /* ================= LOAD SAVED ADDRESS ================= */
+  /* Load saved address */
   useEffect(() => {
     if (!user) return;
 
     const fetchAddress = async () => {
       try {
-        console.log("🟡 Fetching saved address");
         const snap = await getDoc(doc(db, "users", user.uid));
         if (snap.exists() && snap.data()?.address) {
           setAddress(snap.data().address);
-          console.log("🟢 Address loaded");
         }
-      } catch (err) {
-        console.error("❌ Address load error:", err);
+      } catch {
+        toast.error("Failed to load address");
       }
     };
 
     fetchAddress();
   }, [user]);
 
-  /* ================= PAYMENT FLOW ================= */
   const handlePayment = async () => {
-    console.log("🟢 STEP 0: Pay button clicked");
-
     if (!user) {
       toast.error("Please login to continue");
       return navigate("/auth");
@@ -73,46 +64,51 @@ function Checkout() {
       return toast.error("Please enter delivery address");
     }
 
-    if (cartItems.length === 0) {
+    if (!cartItems.length) {
       return toast.error("Cart is empty");
     }
 
     if (!window.Razorpay) {
-      return toast.error("Payment SDK not loaded");
+      return toast.error("Payment service unavailable");
     }
 
     setPlacing(true);
 
     try {
-      console.log("🟡 STEP 1: Creating Razorpay order");
-
       const res = await fetch("/api/createorder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: total }),
       });
 
-      const data = await res.json();
-      console.log("⬅️ Server response:", data);
+      const order = await res.json();
 
-      if (!res.ok || !data?.id) {
-        throw new Error(data?.error || "Order creation failed");
+      if (!res.ok || !order?.id) {
+        throw new Error("Order creation failed");
       }
-
-      console.log("🟢 STEP 2: Order created:", data.id);
 
       const options = {
         key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-        amount: data.amount,
+        amount: order.amount,
         currency: "INR",
         name: "StyleHub",
         description: "Order Payment",
-        order_id: data.id,
+        order_id: order.id,
 
         handler: async (response) => {
-          console.log("🟢 STEP 3: Payment success", response);
-
           try {
+            const verifyRes = await fetch("/api/verifypayment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(response),
+            });
+
+            const verifyData = await verifyRes.json();
+
+            if (!verifyData.verified) {
+              return toast.error("Payment verification failed");
+            }
+
             const orderRef = await addDoc(collection(db, "orders"), {
               userId: user.uid,
               items: cartItems,
@@ -135,9 +131,8 @@ function Checkout() {
             await clearCart();
             toast.success("Payment successful 🎉");
             navigate("/orders");
-          } catch (err) {
-            console.error("❌ Firestore save failed:", err);
-            toast.error("Payment saved failed");
+          } catch {
+            toast.error("Payment verification failed");
           }
         },
 
@@ -151,22 +146,17 @@ function Checkout() {
       const rzp = new window.Razorpay(options);
 
       rzp.on("payment.failed", (res) => {
-        console.error("❌ Payment failed:", res.error);
         toast.error(res.error.description || "Payment failed");
       });
 
-      console.log("🟡 STEP 4: Opening Razorpay");
       rzp.open();
-
-    } catch (err) {
-      console.error("🔥 FINAL ERROR:", err);
-      toast.error(err.message || "Payment failed");
+    } catch {
+      toast.error("Payment failed");
     } finally {
       setPlacing(false);
     }
   };
 
-  /* ================= UI ================= */
   return (
     <div className="checkout-page">
       <h2>Checkout</h2>
