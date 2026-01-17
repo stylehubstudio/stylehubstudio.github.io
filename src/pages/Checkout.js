@@ -27,16 +27,17 @@ function Checkout() {
     0
   );
 
-  /* Load Razorpay */
+  /* ================= LOAD RAZORPAY SCRIPT ================= */
   useEffect(() => {
     if (window.Razorpay) return;
+
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
     document.body.appendChild(script);
   }, []);
 
-  /* Load saved address */
+  /* ================= LOAD SAVED ADDRESS ================= */
   useEffect(() => {
     if (!user) return;
 
@@ -54,6 +55,7 @@ function Checkout() {
     fetchAddress();
   }, [user]);
 
+  /* ================= PAYMENT FLOW ================= */
   const handlePayment = async () => {
     if (!user) {
       toast.error("Please login to continue");
@@ -64,7 +66,7 @@ function Checkout() {
       return toast.error("Please enter delivery address");
     }
 
-    if (!cartItems.length) {
+    if (cartItems.length === 0) {
       return toast.error("Cart is empty");
     }
 
@@ -81,34 +83,22 @@ function Checkout() {
         body: JSON.stringify({ amount: total }),
       });
 
-      const order = await res.json();
+      const data = await res.json();
 
-      if (!res.ok || !order?.id) {
+      if (!res.ok || !data?.id) {
         throw new Error("Order creation failed");
       }
 
       const options = {
         key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-        amount: order.amount,
+        amount: data.amount,
         currency: "INR",
         name: "StyleHub",
         description: "Order Payment",
-        order_id: order.id,
+        order_id: data.id,
 
         handler: async (response) => {
           try {
-            const verifyRes = await fetch("/api/verifypayment", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(response),
-            });
-
-            const verifyData = await verifyRes.json();
-
-            if (!verifyData.verified) {
-              return toast.error("Payment verification failed");
-            }
-
             const orderRef = await addDoc(collection(db, "orders"), {
               userId: user.uid,
               items: cartItems,
@@ -132,7 +122,7 @@ function Checkout() {
             toast.success("Payment successful 🎉");
             navigate("/orders");
           } catch {
-            toast.error("Payment verification failed");
+            toast.error("Order saved failed");
           }
         },
 
@@ -150,13 +140,14 @@ function Checkout() {
       });
 
       rzp.open();
-    } catch {
-      toast.error("Payment failed");
+    } catch (err) {
+      toast.error(err.message || "Payment failed");
     } finally {
       setPlacing(false);
     }
   };
 
+  /* ================= UI ================= */
   return (
     <div className="checkout-page">
       <h2>Checkout</h2>
