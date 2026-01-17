@@ -1,28 +1,38 @@
-import Razorpay from "razorpay";
+import crypto from "crypto";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ verified: false });
   }
 
   try {
-    const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    } = req.body;
 
-    const { amount } = req.body;
+    if (
+      !razorpay_order_id ||
+      !razorpay_payment_id ||
+      !razorpay_signature
+    ) {
+      return res.status(400).json({ verified: false });
+    }
 
-    // Create order on Razorpay
-    const order = await razorpay.orders.create({
-      amount: amount * 100, // amount in paise
-      currency: "INR",
-      receipt: `receipt_${Date.now()}`, // unique internal order ref
-    });
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
 
-    res.status(200).json(order);
-  } catch (err) {
-    console.error("Order creation failed:", err);
-    res.status(500).json({ error: "Order creation failed" });
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest("hex");
+
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ verified: false });
+    }
+
+    res.status(200).json({ verified: true });
+  } catch {
+    res.status(500).json({ verified: false });
   }
 }
