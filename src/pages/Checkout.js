@@ -102,7 +102,7 @@ function Checkout() {
       console.log("🟢 STEP 2: Order created:", data.id);
 
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: import.meta.env.REACT_APP_RAZORPAY_KEY_ID,
         amount: data.amount,
         currency: "INR",
         name: "StyleHub",
